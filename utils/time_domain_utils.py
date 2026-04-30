@@ -15,7 +15,7 @@ class Timestamp(TypedDict):
 def plot_waveform(
     audio: np.ndarray,
     title: str,
-    sr: int = 16000,
+    sr: int | float = 16000,
     sections: list[Timestamp] | None = None,
     sections2: list[Timestamp] | None = None
 ) -> tuple[Figure, Axes]:
@@ -40,6 +40,42 @@ def plot_waveform(
         ax.axvspan(start, end, color="yellow", alpha=0.3)
 
     return fig, ax
+
+
+# Function to plot 1 waveform with optional line
+# color options include r, g, 
+def plot_waveform_with_line(
+    audio: np.ndarray,
+    title: str,
+    hop_length: int,
+    sr: int | float = 16000,
+    lineValues: list[int] | np.ndarray = [],
+    color="r"
+):
+    frames = range(len(lineValues))
+    t = librosa.frames_to_time(frames, hop_length=hop_length)
+    plt.figure(figsize=(15, 3))
+    librosa.display.waveshow(audio, sr=sr, alpha=0.5)
+    plt.plot(t, lineValues, color=color)
+    plt.title(title)
+    plt.xlabel("Time (sec)") 
+    plt.ylabel("Amplitude")
+    plt.show()
+
+# Function to plot multiple waveforms in 1 figure
+# audios and titles should be arrays of equal length
+# also assumes sr is already defined as variable sr
+def plot_waveforms(audios: list[np.ndarray], titles: list[str], sr: int | float = 16000):
+    if(len(audios) != len(titles)):
+        raise ValueError(f"Error: audios and titles should be arrays of the same length")
+    num_of_waves = len(audios)
+    plt.figure(figsize=(15, 8))
+    for i, audio in enumerate(audios):
+        plt.subplot(num_of_waves, 1, i+1) # create subplots of 3 files
+        librosa.display.waveshow(audio, sr=sr, alpha=0.5)
+        plt.title(titles[i])
+    plt.subplots_adjust(hspace=0.5)  # Increase vertical spacing for titles
+    plt.show()
 
 # normalize audio signal so volume is consistent across files
 def rms_normalize(y: np.ndarray, target_dBFS:float = -30.0) -> np.ndarray:
@@ -145,7 +181,7 @@ def convert_timestamps_to_durations(timestamps: list[Timestamp]) -> list[int]:
 
 # Function to spit an audio into an array of individual audios by timestamp.
 # Assumes timestamps are in format {'start': time in seconds, 'end': time in seconds}
-def split_audio_by_timestamps(audio: np.ndarray, timestamps: list[Timestamp], sr: int = 16000) -> list[np.ndarray]:
+def split_audio_by_timestamps(audio: np.ndarray, timestamps: list[Timestamp], sr: int | float = 16000) -> list[np.ndarray]:
     audio_array: list[np.ndarray] = []
     for i, ts in enumerate(timestamps):
         start_sample = int(float(ts['start']) * sr) # convert start time into sample index
@@ -153,3 +189,7 @@ def split_audio_by_timestamps(audio: np.ndarray, timestamps: list[Timestamp], sr
         segment = audio[start_sample:end_sample] # Extract the segment using start and ending sample index
         audio_array.append(segment) # append segment into the array
     return audio_array
+
+# Function to calculate amplitude envelope for each frame
+def amplitude_envelope(audio: np.ndarray, frame_size: int, hop_length: int) -> np.ndarray:
+    return np.array([max(audio[i:i+frame_size]) for i in range(0, len(audio), hop_length)])

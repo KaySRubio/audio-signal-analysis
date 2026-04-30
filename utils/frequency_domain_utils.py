@@ -12,8 +12,32 @@ class FrequencyData(TypedDict):
     max_freq: float
     max_energy_freq: float
 
+
+# Function to extract Short-Time Fourier Transform
+def short_time_fourier_transform(
+    audio: np.ndarray,
+    n_fft: int,
+    hop_length: int,
+    type: Literal["power", "amplitude"] = "power"
+) -> np.ndarray:
+    stft = librosa.stft(audio, n_fft=n_fft, hop_length=hop_length) # outputs matrix of complex numbers for stft
+    # stft.shape # optional - check shape
+    # type(stft[0][0]) # optional - check output type, should be complex number containing phase & amplitude
+    
+    # Remove complex numbers to retain just amplitude/power, and transform to decibels to improve visualization
+    if type=="power":
+        stft_abs = np.abs(stft) ** 2 # use for a power spectrogram
+        stft_dB = librosa.power_to_db(np.abs(stft_abs), ref=np.max)
+    elif type=="amplitude":
+        stft_abs = np.abs(stft) # use for an amplitude spectrogram
+        stft_dB = librosa.amplitude_to_db(np.abs(stft_abs), ref=np.max)
+    else:
+        raise ValueError(f"Error: type should be 'power' or 'amplitude'")
+    # type(stft_abs[0][0]) # optional - check to ensure no longer complex
+    return stft_dB
+
 # Create method to easily plot spectrograms
-def plot_spectrogram(Y: np.ndarray, sr: int, hop_length: int, y_axis: str ="mel", fmin: int = 0, fmax: int = 20000) -> tuple[Figure, Axes]:
+def plot_spectrogram(Y: np.ndarray, sr: int | float, hop_length: int, y_axis: str ="mel", fmin: int = 0, fmax: int = 20000) -> tuple[Figure, Axes]:
     fig, ax = plt.subplots(figsize=(25, 4))
     
     #plt.figure(figsize=(25, 10)) # instantiate a figure and give a size
@@ -32,7 +56,7 @@ def plot_spectrogram(Y: np.ndarray, sr: int, hop_length: int, y_axis: str ="mel"
     return fig, ax
 
 # Create method to easily plot spectrograms AND zoom in on the x-axis
-def plot_spectrogram_zoom(Y: np.ndarray, sr: int, hop_length: int, y_axis: str ="mel", fmin: int =0, fmax: int =20000, xmin: float=0, xmax: float=12) -> tuple[Figure, Axes]:
+def plot_spectrogram_zoom(Y: np.ndarray, sr: int | float, hop_length: int, y_axis: str ="mel", fmin: int =0, fmax: int =20000, xmin: float=0, xmax: float=12) -> tuple[Figure, Axes]:
     fig, ax = plt.subplots(figsize=(25, 10)) # instantiate a figure and give a size
     # use librosa.display.specshow to visualize any type of spectrogram
     librosa.display.specshow(Y, 
@@ -57,7 +81,7 @@ class FrequencyFilterReturn(TypedDict):
 # Apply a cutoff, and zero out all the values below (high-pass filter) or above (low-pass filter)
 def ideal_frequency_filter(
       stft: np.ndarray,
-      sr: int,
+      sr: int | float,
       frame_length: int,
       cutoff: int,
       filter: Literal['high', 'low']
@@ -129,5 +153,32 @@ def extract_min_max_and_most_energy_frequencies(
     # return results
     return {'min_freq': min_freq, 'max_freq': max_freq, 'max_energy_freq': max_energy_freq}
 
+# Function to plot spectral centroid and bandwidth
+def plot_spectral_centroid(
+    sc: np.ndarray,
+    sban: np.ndarray,
+    hop_length: int,
+    title: str = ''
+):
+    frames = range(len(sc))
+    time = librosa.frames_to_time(frames, hop_length=hop_length)
+    # Calculate upper and lower bounds
+    upper = np.array(sc) + np.array(sban)
+    lower = np.array(sc) - np.array(sban)
+    plt.figure(figsize=(25,10))
+    plt.plot(time, sc, color='b', label='Spectral Centroid')
+    plt.fill_between(time, upper, lower, alpha=0.2, label='Spectral Bandwidth')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Spectral centroid values')
+    plt.title(title)
+    plt.legend()
+    plt.show()
 
-
+# Visualizing MFCCs
+def plot_mfccs(mfccs: np.ndarray, sr: int | float, title: str = ''):
+  plt.figure(figsize=(25, 5))
+  librosa.display.specshow(mfccs, x_axis='time', sr=sr)
+  plt.colorbar(format="%+2.f")
+  plt.title(title)
+  plt.tight_layout()
+  plt.show()
