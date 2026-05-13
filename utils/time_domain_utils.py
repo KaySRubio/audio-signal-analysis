@@ -53,7 +53,7 @@ def plot_waveform_with_line(
     color="r"
 ):
     frames = range(len(lineValues))
-    t = librosa.frames_to_time(frames, hop_length=hop_length)
+    t = librosa.frames_to_time(frames, sr=sr, hop_length=hop_length)
     plt.figure(figsize=(15, 3))
     librosa.display.waveshow(audio, sr=sr, alpha=0.5)
     plt.plot(t, lineValues, color=color)

@@ -161,7 +161,7 @@ def plot_spectral_centroid(
     title: str = ''
 ):
     frames = range(len(sc))
-    time = librosa.frames_to_time(frames, hop_length=hop_length)
+    time = librosa.frames_to_time(frames, hop_length=hop_length) # TODO --> may need to add sr=sr
     # Calculate upper and lower bounds
     upper = np.array(sc) + np.array(sban)
     lower = np.array(sc) - np.array(sban)
