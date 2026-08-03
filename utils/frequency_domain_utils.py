@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import numpy as np
+from scipy.io import wavfile
+import noisereduce as nr # https://pypi.org/project/noisereduce/
 
 class FrequencyData(TypedDict):
     min_freq: float
@@ -55,23 +57,52 @@ def plot_spectrogram(Y: np.ndarray, sr: int | float, hop_length: int, y_axis: st
     ax.set_title('Spectrogram')
     return fig, ax
 
-# Create method to easily plot spectrograms AND zoom in on the x-axis
-def plot_spectrogram_zoom(Y: np.ndarray, sr: int | float, hop_length: int, y_axis: str ="mel", fmin: int =0, fmax: int =20000, xmin: float=0, xmax: float=12) -> tuple[Figure, Axes]:
-    fig, ax = plt.subplots(figsize=(25, 10)) # instantiate a figure and give a size
-    # use librosa.display.specshow to visualize any type of spectrogram
-    librosa.display.specshow(Y, 
-      sr=sr, 
-      hop_length=hop_length, 
-      x_axis="time", 
-      y_axis=y_axis
-		)
+def plot_spectrogram_zoom(
+    Y: np.ndarray,
+    sr: int | float,
+    hop_length: int,
+    y_axis: str = "mel",
+    fmin: int = 0,
+    fmax: int = 20000,
+    xmin: float = 0,
+    xmax: float = 12,
+    regions: list[dict] | None = None,
+    type: Literal["shade", "lines"] = "shade",
+    title: str = "Spectrogram"
+) -> tuple[Figure, Axes]:
+
+    fig, ax = plt.subplots(figsize=(25, 10))
+
+    librosa.display.specshow(
+      Y,
+      sr=sr,
+      hop_length=hop_length,
+      x_axis="time",
+      y_axis=y_axis,
+      ax=ax
+    )
+
     ax.set_ylim(fmin, fmax)
     ax.set_xlim(xmin, xmax)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Frequency (Hz)')    
-    # plt.colorbar(format="%+2.f") # add a color bar legend
-    ax.set_title('Spectrogram')
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Frequency (Hz)")
+    ax.set_title(title)
+
+    if regions is not None:
+      for region in regions:
+        if type == "lines":
+          ax.axvline(region["start"], color="blue", linewidth=2)
+          ax.axvline(region["end"], color="blue", linewidth=2)
+        else:
+          ax.axvspan(
+            region["start"],
+            region["end"],
+            color="red",
+            alpha=0.25
+      )
+
     return fig, ax
+
 
 class FrequencyFilterReturn(TypedDict):
    frequencies: np.ndarray
@@ -182,3 +213,35 @@ def plot_mfccs(mfccs: np.ndarray, sr: int | float, title: str = ''):
   plt.title(title)
   plt.tight_layout()
   plt.show()
+
+# works best with SR=16000, and for files with SNR < 0
+# does not cut out babble but will cut out stationary noise
+def reduce_stationary_noise(input_filepath, output_filepath):
+    rate, data = wavfile.read(input_filepath)
+
+    # convert to mono if stereo
+    if data.ndim == 2:
+        data = data.mean(axis=1)
+
+    data_float = data.astype(np.float32)
+
+    # normalize to [-1.0, 1.0] based on actual range, not dtype
+    max_val = np.abs(data_float).max()
+    if max_val > 1.0:
+        data_float = data_float / max_val
+
+    reduced = nr.reduce_noise(
+        y=data_float,
+        sr=rate,
+        stationary=True  # fast; avoids the nonstationary blowup
+        # prop_decrease=0.75,     # less aggressive, preserves more speech
+        # n_fft=512,              # smaller FFT = faster
+    )
+
+    reduced = np.clip(reduced, -1.0, 1.0)
+
+    # convert back to bit depth int16
+    out = (reduced * 32767).astype(np.int16)
+
+    # write as float32 wav (universally supported)
+    wavfile.write(output_filepath, rate, out)
