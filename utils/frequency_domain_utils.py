@@ -89,6 +89,7 @@ def plot_spectrogram_zoom(
     ax.set_title(title)
 
     if regions is not None:
+      ymax = ax.get_ylim()[1]
       for region in regions:
         if type == "lines":
           ax.axvline(region["start"], color="blue", linewidth=2)
@@ -99,8 +100,25 @@ def plot_spectrogram_zoom(
             region["end"],
             color="red",
             alpha=0.25
-      )
+          )
 
+        # Draw label if present
+        if "label" in region:
+            ax.text(
+                (region["start"] + region["end"]) / 2,      # center horizontally
+                ymax * 0.98,            # near the top
+                region["label"],
+                ha="center",
+                va="top",
+                fontsize=16,
+                color="white",
+                bbox=dict(
+                    facecolor="black",
+                    alpha=0.7,
+                    edgecolor="none",
+                    pad=2,
+                ),
+            )
     return fig, ax
 
 
